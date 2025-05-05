@@ -2,7 +2,7 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { Logo } from "./Logo";
-import { FileText, MessageCircle, CheckSquare, Search, FileText2 } from "lucide-react";
+import { FileText, MessageCircle, CheckSquare, Search } from "lucide-react";
 
 export const Sidebar: React.FC = () => {
   return (
@@ -30,7 +30,7 @@ export const Sidebar: React.FC = () => {
                 `sidebar-item ${isActive ? "active" : ""}`
               }
             >
-              <FileText2 className="h-4 w-4 mr-2" />
+              <FileText className="h-4 w-4 mr-2" />
               <span>Resúmenes</span>
             </NavLink>
           </li>
