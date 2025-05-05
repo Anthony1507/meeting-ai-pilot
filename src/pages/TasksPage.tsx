@@ -1,233 +1,242 @@
 
 import React, { useState } from "react";
-import { useMeeting } from "@/contexts/MeetingContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMeeting, Task } from "@/contexts/MeetingContext";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
-import { Check, Clock, MoreHorizontal, Plus, ChevronDown, UserPlus } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CheckCircle2, Clock, AlertCircle, XCircle, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function TasksPage() {
   const { tasks, updateTaskStatus } = useMeeting();
-  const [showConfirmation, setShowConfirmation] = useState<string | null>(null);
   const { toast } = useToast();
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [view, setView] = useState<"cards" | "list">("cards");
 
   const pendingTasks = tasks.filter((task) => task.status === "pending");
   const inProgressTasks = tasks.filter((task) => task.status === "in-progress");
   const completedTasks = tasks.filter((task) => task.status === "completed");
 
-  const handleStatusChange = (taskId: string, newStatus: "pending" | "in-progress" | "completed") => {
-    updateTaskStatus(taskId, newStatus);
-    setShowConfirmation(taskId);
+  const handleUpdateStatus = (taskId: string, status: Task["status"]) => {
+    updateTaskStatus(taskId, status);
     
     toast({
       title: "Estado actualizado",
-      description: `Tarea marcada como ${newStatus === "pending" ? "pendiente" : 
-                   newStatus === "in-progress" ? "en progreso" : "completada"}`,
+      description: `La tarea ha sido movida a ${
+        status === "pending"
+          ? "pendientes"
+          : status === "in-progress"
+          ? "en progreso"
+          : "completadas"
+      }`,
     });
-    
-    setTimeout(() => setShowConfirmation(null), 2000);
   };
 
-  const handleAssignToMe = (taskId: string) => {
+  const handleAddTask = () => {
     toast({
-      title: "Tarea asignada",
-      description: "La tarea ha sido asignada a ti",
+      title: "Crear tarea",
+      description: "Funcionalidad en desarrollo",
     });
   };
 
-  const handleAddNewTask = (column: string) => {
-    toast({
-      title: "Nueva tarea",
-      description: `Crear nueva tarea en ${column === "pending" ? "Pendientes" : 
-                   column === "in-progress" ? "En progreso" : "Completadas"}`,
-    });
-  };
-
-  const handleToggleDetails = (taskId: string) => {
-    setActiveDropdown(activeDropdown === taskId ? null : taskId);
-  };
-
-  const TaskCard = ({ task }: { task: typeof tasks[0] }) => (
-    <Card className={`mb-3 ${showConfirmation === task.id ? "ring-2 ring-primary animate-pulse" : ""}`}>
-      <CardContent className="p-4">
-        <div className="flex justify-between">
-          <h3 className="font-medium mb-1 flex-1">{task.title}</h3>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {task.status !== "pending" && (
-                <DropdownMenuItem onClick={() => handleStatusChange(task.id, "pending")}>
-                  Marcar como pendiente
-                </DropdownMenuItem>
-              )}
-              {task.status !== "in-progress" && (
-                <DropdownMenuItem onClick={() => handleStatusChange(task.id, "in-progress")}>
-                  Marcar en progreso
-                </DropdownMenuItem>
-              )}
-              {task.status !== "completed" && (
-                <DropdownMenuItem onClick={() => handleStatusChange(task.id, "completed")}>
-                  Marcar como completada
-                </DropdownMenuItem>
-              )}
-              {!task.assignee && (
-                <DropdownMenuItem onClick={() => handleAssignToMe(task.id)}>
-                  Asignar a mí
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={() => handleToggleDetails(task.id)}>
-                {activeDropdown === task.id ? "Ocultar detalles" : "Ver detalles"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <p className="text-sm text-muted-foreground mb-3">{task.description}</p>
-        <div className="flex justify-between items-center text-xs">
-          <div className="flex items-center gap-2">
-            {task.assignee ? (
-              <>
-                <Avatar className="h-5 w-5">
-                  <AvatarImage src={task.assignee.avatar} />
-                  <AvatarFallback>
-                    {task.assignee.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <span>{task.assignee.name}</span>
-              </>
-            ) : (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-5 px-1 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => handleAssignToMe(task.id)}
+  const TaskCard = ({ task }: { task: Task }) => {
+    return (
+      <Card className="mb-4 hover:shadow-md transition-shadow animate-fade-in">
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-start">
+            <CardTitle className="text-base">{task.title}</CardTitle>
+            <StatusBadge status={task.status} />
+          </div>
+          <CardDescription className="text-sm">
+            {task.dueDate && (
+              <div className="flex items-center mt-1 text-muted-foreground">
+                <Clock className="h-3 w-3 mr-1" />
+                <span>
+                  Fecha límite: {format(task.dueDate, "dd/MM/yyyy")}
+                </span>
+              </div>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pb-2">
+          <p className="text-sm text-muted-foreground">{task.description}</p>
+          {task.assignee && (
+            <div className="flex items-center mt-3">
+              <Avatar className="h-5 w-5 mr-1">
+                <AvatarImage src={task.assignee.avatar} />
+                <AvatarFallback>
+                  {task.assignee.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-xs">{task.assignee.name}</span>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-between pt-0">
+          <div className="text-xs text-muted-foreground">
+            Creada el {format(task.createdAt, "dd/MM/yyyy")}
+          </div>
+          <div className="flex space-x-2">
+            {task.status !== "pending" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => handleUpdateStatus(task.id, "pending")}
               >
-                <UserPlus className="h-3 w-3 mr-1" />
-                Asignar
+                Pendiente
+              </Button>
+            )}
+            {task.status !== "in-progress" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => handleUpdateStatus(task.id, "in-progress")}
+              >
+                En progreso
+              </Button>
+            )}
+            {task.status !== "completed" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => handleUpdateStatus(task.id, "completed")}
+              >
+                Completada
               </Button>
             )}
           </div>
-          {task.dueDate && (
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span>{format(task.dueDate, "dd/MM/yyyy")}</span>
-            </div>
-          )}
-        </div>
-        
-        {activeDropdown === task.id && (
-          <div className="mt-3 pt-3 border-t text-xs">
-            <div className="grid gap-2">
-              <div>
-                <span className="font-medium">Creado:</span> {format(task.createdAt, "dd/MM/yyyy HH:mm")}
-              </div>
-              {task.fromMessageId && (
-                <div>
-                  <span className="font-medium">Origen:</span> Extraído de la reunión
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {showConfirmation === task.id && (
-          <div className="mt-3 text-xs text-primary flex items-center gap-1 bg-primary/10 p-2 rounded">
-            <Check className="h-3 w-3" />
-            <span>Estado actualizado</span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  const TaskColumn = ({ title, color, tasks, status }: { 
-    title: string, 
-    color: string, 
-    tasks: typeof tasks, 
-    status: "pending" | "in-progress" | "completed" 
-  }) => (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`h-5 w-1 rounded bg-${color}`} style={{ backgroundColor: color }}></div>
-              {title}
-              <span className="bg-secondary text-muted-foreground text-xs rounded-full px-2">
-                {tasks.length}
-              </span>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 w-7 p-0" 
-              onClick={() => handleAddNewTask(status)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 max-h-[60vh] overflow-y-auto">
-          {tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No hay tareas {status === "pending" ? "pendientes" : 
-                          status === "in-progress" ? "en progreso" : "completadas"}
-            </p>
-          ) : (
-            tasks.map((task) => <TaskCard key={task.id} task={task} />)
-          )}
-        </CardContent>
+        </CardFooter>
       </Card>
-    </div>
-  );
+    );
+  };
+
+  const StatusBadge = ({ status }: { status: Task["status"] }) => {
+    switch (status) {
+      case "pending":
+        return (
+          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Pendiente
+          </Badge>
+        );
+      case "in-progress":
+        <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+          <Clock className="h-3 w-3 mr-1" />
+          En progreso
+        </Badge>;
+        return (
+          <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+            <Clock className="h-3 w-3 mr-1" />
+            En progreso
+          </Badge>
+        );
+      case "completed":
+        return (
+          <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Completada
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Tareas Asignadas</h1>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Tarea
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Tareas del proyecto</h1>
+        <Button onClick={handleAddTask}>
+          <Plus className="mr-1 h-4 w-4" /> Nueva tarea
         </Button>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <TaskColumn 
-          title="Pendientes" 
-          color="meeting-task" 
-          tasks={pendingTasks} 
-          status="pending" 
-        />
-        
-        <TaskColumn 
-          title="En Progreso" 
-          color="meeting-definition" 
-          tasks={inProgressTasks} 
-          status="in-progress" 
-        />
-        
-        <TaskColumn 
-          title="Completadas" 
-          color="primary" 
-          tasks={completedTasks} 
-          status="completed" 
-        />
+      
+      <div className="mb-6">
+        <p className="text-muted-foreground mb-2">
+          Estas son todas las tareas extraídas de las reuniones y las asignadas manualmente.
+        </p>
+        <div className="flex items-center">
+          <Button
+            variant={view === "cards" ? "default" : "outline"}
+            size="sm"
+            className="mr-2"
+            onClick={() => setView("cards")}
+          >
+            Cards
+          </Button>
+          <Button
+            variant={view === "list" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("list")}
+          >
+            Lista
+          </Button>
+        </div>
       </div>
+      
+      <Tabs defaultValue="all">
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">Todas ({tasks.length})</TabsTrigger>
+          <TabsTrigger value="pending">
+            Pendientes ({pendingTasks.length})
+          </TabsTrigger>
+          <TabsTrigger value="in-progress">
+            En progreso ({inProgressTasks.length})
+          </TabsTrigger>
+          <TabsTrigger value="completed">
+            Completadas ({completedTasks.length})
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="all" className="space-y-4">
+          <div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : ""}>
+            {tasks.map((task) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="pending" className="space-y-4">
+          <div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : ""}>
+            {pendingTasks.map((task) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="in-progress" className="space-y-4">
+          <div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : ""}>
+            {inProgressTasks.map((task) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="completed" className="space-y-4">
+          <div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : ""}>
+            {completedTasks.map((task) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+            {completedTasks.length === 0 && (
+              <div className="text-center p-8 bg-muted/50 rounded-lg">
+                <XCircle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                <h3 className="text-lg font-medium">No hay tareas completadas</h3>
+                <p className="text-sm text-muted-foreground">
+                  Las tareas completadas aparecerán aquí
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

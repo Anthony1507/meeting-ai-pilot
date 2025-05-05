@@ -2,6 +2,7 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { Logo } from "./Logo";
+import { FileText, MessageCircle, CheckSquare, Search, FileText2 } from "lucide-react";
 
 export const Sidebar: React.FC = () => {
   return (
@@ -18,8 +19,19 @@ export const Sidebar: React.FC = () => {
                 `sidebar-item ${isActive ? "active" : ""}`
               }
             >
-              <span className="mr-1">📋</span>
+              <MessageCircle className="h-4 w-4 mr-2" />
               <span>Reunión activa</span>
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="/summary"
+              className={({ isActive }) =>
+                `sidebar-item ${isActive ? "active" : ""}`
+              }
+            >
+              <FileText2 className="h-4 w-4 mr-2" />
+              <span>Resúmenes</span>
             </NavLink>
           </li>
           <li>
@@ -29,7 +41,7 @@ export const Sidebar: React.FC = () => {
                 `sidebar-item ${isActive ? "active" : ""}`
               }
             >
-              <span className="mr-1">📄</span>
+              <FileText className="h-4 w-4 mr-2" />
               <span>Bitácora</span>
             </NavLink>
           </li>
@@ -40,7 +52,7 @@ export const Sidebar: React.FC = () => {
                 `sidebar-item ${isActive ? "active" : ""}`
               }
             >
-              <span className="mr-1">✅</span>
+              <CheckSquare className="h-4 w-4 mr-2" />
               <span>Tareas asignadas</span>
             </NavLink>
           </li>
@@ -51,7 +63,7 @@ export const Sidebar: React.FC = () => {
                 `sidebar-item ${isActive ? "active" : ""}`
               }
             >
-              <span className="mr-1">🔍</span>
+              <Search className="h-4 w-4 mr-2" />
               <span>Buscar decisiones</span>
             </NavLink>
           </li>

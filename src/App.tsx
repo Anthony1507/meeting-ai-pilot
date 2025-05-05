@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { MeetingProvider } from "@/contexts/MeetingContext";
 import LandingPage from "./pages/LandingPage";
 import MeetingPage from "./pages/MeetingPage";
+import SummaryPage from "./pages/SummaryPage";
 import LogPage from "./pages/LogPage";
 import TasksPage from "./pages/TasksPage";
 import SearchPage from "./pages/SearchPage";
@@ -38,6 +39,7 @@ const AppRoutes = () => {
         }
       >
         <Route path="meeting" element={<MeetingPage />} />
+        <Route path="summary" element={<SummaryPage />} />
         <Route path="log" element={<LogPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="search" element={<SearchPage />} />
