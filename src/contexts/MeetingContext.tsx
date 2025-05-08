@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { meetingService } from "@/services/meeting.service";
 import { aiService } from "@/services/ai.service";
@@ -300,7 +301,7 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
       
       toast({
         title: "Reunión iniciada",
-        description: `"${title}" ha iniciado correctamente.",
+        description: `"${title}" ha iniciado correctamente.`,
       });
     } catch (error) {
       console.error('Error starting meeting:', error);
