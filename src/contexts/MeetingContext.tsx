@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { meetingService } from "@/services/meeting.service";
 import { aiService } from "@/services/ai.service";
@@ -301,7 +300,7 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
       
       toast({
         title: "Reunión iniciada",
-        description: `"${title}" ha iniciado correctamente.`,
+        description: `"${title}" ha iniciado correctamente.",
       });
     } catch (error) {
       console.error('Error starting meeting:', error);
@@ -327,9 +326,9 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
         status: 'completed',
       });
       
-      // Generar resumen de la reunión con IA
+      // Generate meeting summary with AI
       const messageHistory = messages.map(msg => ({
-        role: msg.type === 'user' ? 'user' : 'assistant',
+        role: msg.type === 'user' ? ('user' as const) : ('assistant' as const),
         content: msg.content,
       }));
       
@@ -337,7 +336,7 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
         messages: messageHistory,
       });
       
-      // Guardar el resumen como un mensaje especial
+      // Save the summary as a special message
       await meetingService.addMessage(activeMeeting.id, {
         type: 'ai',
         content: summary.summary,
