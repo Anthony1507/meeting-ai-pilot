@@ -5,17 +5,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, Mic, Paperclip, ThumbsUp } from "lucide-react";
+import { Send, Mic, Paperclip, ThumbsUp, MicOff } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { aiService } from "@/services/ai.service";
 
 export default function MeetingPage() {
-  const { messages, addMessage } = useMeeting();
+  const { messages, addMessage, activeMeeting, isLoading, startMeeting, endMeeting } = useMeeting();
   const { user } = useAuth();
   const { toast } = useToast();
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
@@ -23,11 +26,11 @@ export default function MeetingPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || !user) return;
 
-    addMessage({
+    await addMessage({
       type: "user",
       content: inputValue.trim(),
       sender: {
@@ -36,36 +39,43 @@ export default function MeetingPage() {
         avatar: user.avatar,
       },
     });
-    setInputValue("");
     
-    toast({
-      title: "Mensaje enviado",
-      description: "El asistente está procesando tu mensaje",
-    });
+    setInputValue("");
   };
 
-  const handleMicClick = () => {
-    setIsRecording(!isRecording);
-    toast({
-      title: isRecording ? "Grabación detenida" : "Grabando audio",
-      description: isRecording ? "Procesando audio..." : "Habla claramente...",
-    });
-    
-    // Simulate stopping recording after 3 seconds
-    if (!isRecording) {
-      setTimeout(() => {
-        setIsRecording(false);
-        toast({
-          title: "Audio procesado",
-          description: "¿Podemos revisar el avance del sprint anterior?",
-        });
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        setAudioBlob(blob);
         
-        // Simulate sending the transcribed message
-        setTimeout(() => {
-          if (user) {
-            addMessage({
+        try {
+          toast({
+            title: "Procesando audio",
+            description: "Transcribiendo grabación...",
+          });
+          
+          const transcription = await aiService.generateTranscription(blob);
+          
+          if (transcription && user) {
+            toast({
+              title: "Transcripción completada",
+              description: transcription.substring(0, 50) + "...",
+            });
+            
+            await addMessage({
               type: "user",
-              content: "¿Podemos revisar el avance del sprint anterior?",
+              content: transcription,
               sender: {
                 id: user.id,
                 name: user.name,
@@ -73,9 +83,62 @@ export default function MeetingPage() {
               },
             });
           }
-        }, 1000);
-      }, 3000);
+        } catch (error) {
+          console.error('Error transcribing audio:', error);
+          toast({
+            title: "Error",
+            description: "No se pudo transcribir el audio.",
+            variant: "destructive",
+          });
+        }
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+
+      toast({
+        title: "Grabando audio",
+        description: "Habla claramente...",
+      });
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo acceder al micrófono.",
+        variant: "destructive",
+      });
     }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      
+      // Stop all audio tracks
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      
+      toast({
+        title: "Grabación detenida",
+        description: "Procesando audio...",
+      });
+    }
+  };
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const handleAttachClick = () => {
+    toast({
+      title: "Adjuntar archivo",
+      description: "Función de adjuntar archivo en desarrollo",
+    });
   };
 
   const handleReaction = (messageId: string) => {
@@ -85,11 +148,29 @@ export default function MeetingPage() {
     });
   };
 
-  const handleAttachClick = () => {
-    toast({
-      title: "Adjuntar archivo",
-      description: "Función de adjuntar archivo en desarrollo",
-    });
+  const handleStartMeeting = async () => {
+    try {
+      await startMeeting(
+        "Sprint Planning #12",
+        "Planificación del sprint número 12",
+        [user?.id as string]
+      );
+      
+      toast({
+        title: "Reunión iniciada",
+        description: "La reunión ha comenzado correctamente.",
+      });
+    } catch (error) {
+      console.error('Error starting meeting:', error);
+    }
+  };
+
+  const handleEndMeeting = async () => {
+    try {
+      await endMeeting();
+    } catch (error) {
+      console.error('Error ending meeting:', error);
+    }
   };
 
   const MessageItem: React.FC<{ message: Message }> = ({ message }) => {
@@ -179,17 +260,33 @@ export default function MeetingPage() {
     );
   };
 
+  if (!activeMeeting) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="max-w-md text-center p-6">
+          <h2 className="text-2xl font-bold mb-4">No hay reunión activa</h2>
+          <p className="text-muted-foreground mb-6">
+            Para comenzar una nueva reunión, haz clic en el botón de abajo.
+          </p>
+          <Button onClick={handleStartMeeting} disabled={isLoading}>
+            {isLoading ? "Iniciando..." : "Iniciar nueva reunión"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full pb-4">
       <div className="p-4 border-b">
-        <h2 className="text-xl font-semibold">Reunión: Sprint Planning #12</h2>
+        <h2 className="text-xl font-semibold">{activeMeeting.title}</h2>
         <div className="flex items-center gap-2">
           <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
           <p className="text-sm text-muted-foreground">
-            En curso • Iniciada hace 1 hora
+            En curso • Iniciada hace {Math.floor((new Date().getTime() - activeMeeting.createdAt.getTime()) / (1000 * 60))} minutos
           </p>
           <Badge variant="outline" className="ml-2 bg-primary/10 text-primary text-xs">
-            5 participantes
+            {activeMeeting.participants.length} participantes
           </Badge>
         </div>
       </div>
@@ -217,6 +314,7 @@ export default function MeetingPage() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             className="flex-1"
+            disabled={isLoading || isRecording}
           />
           <Button 
             type="button" 
@@ -224,13 +322,28 @@ export default function MeetingPage() {
             variant={isRecording ? "destructive" : "outline"}
             className={isRecording ? "animate-pulse" : ""}
             onClick={handleMicClick}
+            disabled={isLoading}
           >
-            <Mic className="h-4 w-4" />
+            {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
-          <Button type="submit" size="icon">
+          <Button 
+            type="submit" 
+            size="icon"
+            disabled={isLoading || isRecording || !inputValue.trim()}
+          >
             <Send className="h-4 w-4" />
           </Button>
         </form>
+        <div className="mt-3 flex justify-end">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleEndMeeting}
+            className="text-destructive"
+          >
+            Finalizar reunión
+          </Button>
+        </div>
       </div>
     </div>
   );

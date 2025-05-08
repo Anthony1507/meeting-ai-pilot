@@ -1,5 +1,7 @@
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { authService, SignInCredentials, SignUpCredentials } from "@/services/auth.service";
+import { useToast } from "@/hooks/use-toast";
 
 type User = {
   id: string;
@@ -11,75 +13,132 @@ type User = {
 
 type AuthContextType = {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  isLoading: boolean;
+  login: (credentials: SignInCredentials) => Promise<boolean>;
+  register: (credentials: SignUpCredentials) => Promise<boolean>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const MOCK_USERS = [
-  {
-    id: "1",
-    email: "usuario1@copilot.com",
-    password: "123456",
-    name: "Ana Martínez",
-    avatar: "https://i.pravatar.cc/150?img=1",
-    role: "Developer",
-  },
-  {
-    id: "2",
-    email: "usuario2@copilot.com",
-    password: "abcdef",
-    name: "Carlos Rodríguez",
-    avatar: "https://i.pravatar.cc/150?img=3",
-    role: "Product Manager",
-  },
-  {
-    id: "3",
-    email: "scrum@copilot.com",
-    password: "copilot23",
-    name: "Laura Gómez",
-    avatar: "https://i.pravatar.cc/150?img=5",
-    role: "Scrum Master",
-  },
-];
+// Función auxiliar para obtener avatar por defecto
+const getDefaultAvatar = (name: string) => {
+  // Genera un avatar basado en las iniciales o usa un servicio como ui-avatars
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&size=200`;
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   children 
 }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  const login = async (email: string, password: string) => {
-    // Simulate API call with timeout
-    return new Promise<boolean>((resolve) => {
-      setTimeout(() => {
-        const foundUser = MOCK_USERS.find(
-          (u) => u.email === email && u.password === password
-        );
-
-        if (foundUser) {
-          // Remove password from user object for security
-          const { password, ...userWithoutPassword } = foundUser;
-          setUser(userWithoutPassword);
-          resolve(true);
-        } else {
-          resolve(false);
+  // Verificar usuario al inicio
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+          // Transformamos los datos del usuario a nuestro formato
+          setUser({
+            id: currentUser.id,
+            email: currentUser.email || '',
+            name: currentUser.user_metadata?.name || 'Usuario',
+            avatar: currentUser.user_metadata?.avatar_url || getDefaultAvatar(currentUser.user_metadata?.name || 'Usuario'),
+            role: currentUser.user_metadata?.role || 'Usuario',
+          });
         }
-      }, 500); // Simulate network delay
-    });
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkUser();
+  }, []);
+
+  const login = async ({ email, password }: SignInCredentials) => {
+    try {
+      setIsLoading(true);
+      const { user: authUser } = await authService.signIn({ email, password });
+      
+      if (authUser) {
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: authUser.user_metadata?.name || 'Usuario',
+          avatar: authUser.user_metadata?.avatar_url || getDefaultAvatar(authUser.user_metadata?.name || 'Usuario'),
+          role: authUser.user_metadata?.role || 'Usuario',
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Error de autenticación",
+        description: "Credenciales incorrectas o problemas en el servidor.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const logout = () => {
-    setUser(null);
+  const register = async ({ email, password, name }: SignUpCredentials) => {
+    try {
+      setIsLoading(true);
+      const { user: authUser } = await authService.signUp({ email, password, name });
+      
+      if (authUser) {
+        toast({
+          title: "Registro exitoso",
+          description: "Tu cuenta ha sido creada. Por favor, verifica tu email.",
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast({
+        title: "Error de registro",
+        description: "No se pudo crear la cuenta. Intenta nuevamente.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setIsLoading(true);
+      await authService.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Error al cerrar sesión",
+        description: "Hubo un problema al cerrar sesión.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        isLoading,
         login,
+        register,
         logout,
         isAuthenticated: !!user,
       }}

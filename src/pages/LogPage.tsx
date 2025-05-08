@@ -1,12 +1,11 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useMeeting, Message } from "@/contexts/MeetingContext";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Filter, Calendar, Download, Share2, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -17,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function LogPage() {
-  const { filteredMessages, activeFilter, setActiveFilter } = useMeeting();
+  const { filteredMessages, activeFilter, setActiveFilter, isLoading } = useMeeting();
   const { toast } = useToast();
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   
@@ -32,17 +31,59 @@ export default function LogPage() {
   };
 
   const handleExportLog = () => {
+    // Crear un archivo CSV o PDF con los mensajes filtrados
+    const filteredData = aiMessages.map(msg => ({
+      timestamp: format(msg.timestamp, "yyyy-MM-dd HH:mm:ss"),
+      category: msg.category || "general",
+      content: msg.content.replace(/"/g, '""') // Escapar comillas para CSV
+    }));
+    
+    // Crear encabezados CSV
+    const headers = ["Fecha", "Categoría", "Contenido"];
+    
+    // Crear contenido CSV
+    const csvContent = [
+      headers.join(','),
+      ...filteredData.map(row => [
+        `"${row.timestamp}"`,
+        `"${row.category}"`,
+        `"${row.content}"`
+      ].join(','))
+    ].join('\n');
+    
+    // Crear un blob y descargar
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `bitacora_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
     toast({
       title: "Exportando bitácora",
-      description: "El archivo se descargará en breve",
+      description: "El archivo se ha descargado correctamente",
     });
   };
 
   const handleShareLog = () => {
-    toast({
-      title: "Compartir bitácora",
-      description: "Enlace copiado al portapapeles",
-    });
+    // Simular compartir el enlace
+    navigator.clipboard.writeText(window.location.href)
+      .then(() => {
+        toast({
+          title: "Compartir bitácora",
+          description: "Enlace copiado al portapapeles",
+        });
+      })
+      .catch(err => {
+        console.error('Error copying to clipboard:', err);
+        toast({
+          title: "Error",
+          description: "No se pudo copiar el enlace",
+          variant: "destructive",
+        });
+      });
   };
   
   const renderCategoryBadge = (category?: string) => {
@@ -107,6 +148,17 @@ export default function LogPage() {
       description: `${aiMessages.filter(msg => !filter || msg.category === filter).length} elementos encontrados`,
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>Cargando bitácora...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
