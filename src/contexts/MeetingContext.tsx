@@ -18,6 +18,7 @@ export interface Message {
     avatar: string;
   };
   category?: MessageCategory;
+  meeting_id?: string;
 }
 
 export interface Task {
@@ -33,6 +34,10 @@ export interface Task {
   dueDate?: Date;
   createdAt: Date;
   fromMessageId?: string;
+  meeting_id?: string;
+  created_at?: string;
+  due_date?: string;
+  from_message_id?: string;
 }
 
 interface Meeting {
@@ -42,6 +47,7 @@ interface Meeting {
   status: 'planned' | 'in-progress' | 'completed';
   participants: string[];
   createdAt: Date;
+  created_at?: string;
 }
 
 type MeetingContextType = {
@@ -120,7 +126,17 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
   const loadMessages = async (meetingId: string) => {
     try {
       const messagesData = await meetingService.getMessages(meetingId);
-      setMessages(messagesData);
+      // Convert the messages to the expected type format
+      const typedMessages: Message[] = messagesData.map(msg => ({
+        id: msg.id,
+        type: msg.type as MessageType,
+        content: msg.content,
+        timestamp: new Date(msg.timestamp),
+        sender: msg.sender,
+        category: msg.category as MessageCategory | undefined,
+        meeting_id: msg.meeting_id
+      }));
+      setMessages(typedMessages);
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -129,7 +145,22 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
   const loadTasks = async (meetingId: string) => {
     try {
       const tasksData = await meetingService.getTasks(meetingId);
-      setTasks(tasksData);
+      // Convert the tasks to the expected type format
+      const typedTasks: Task[] = tasksData.map(task => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status as "pending" | "in-progress" | "completed",
+        assignee: task.assignee,
+        dueDate: task.dueDate,
+        createdAt: task.createdAt,
+        fromMessageId: task.fromMessageId,
+        meeting_id: task.meeting_id,
+        created_at: task.created_at,
+        due_date: task.due_date,
+        from_message_id: task.from_message_id
+      }));
+      setTasks(typedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
     }
