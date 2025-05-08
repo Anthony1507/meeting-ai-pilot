@@ -1,44 +1,32 @@
-
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 
-export const LoginForm: React.FC = () => {
+export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { signIn } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     try {
-      const success = await login(email, password);
-      
-      if (success) {
-        toast({
-          title: "Inicio de sesión exitoso",
-          description: "Bienvenido a CollabCopilot",
-        });
-        navigate("/meeting");
-      } else {
-        toast({
-          title: "Error de autenticación",
-          description: "Credenciales incorrectas. Por favor, inténtalo de nuevo.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
+      await signIn({ email, password });
+      navigate("/meeting");
+    } catch (error: any) {
+      console.error("Failed to sign in:", error.message);
       toast({
         title: "Error",
-        description: "Ocurrió un problema al iniciar sesión. Por favor, inténtalo de nuevo.",
+        description: "Failed to sign in: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -47,65 +35,45 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <Card className="w-full max-w-md animate-fade-in">
+    <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle className="text-xl font-bold">Acceso</CardTitle>
+        <CardTitle>Iniciar Sesión</CardTitle>
         <CardDescription>
-          Inicia sesión para acceder a tu cuenta
+          Ingresa tus credenciales para acceder a la plataforma.
         </CardDescription>
       </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label
-              htmlFor="email"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Correo electrónico
-            </label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="correo@ejemplo.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Contraseña
-            </label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <div className="bg-secondary/50 p-3 rounded-md text-sm">
-            <strong>Cuentas de prueba:</strong>
-            <ul className="mt-1 space-y-1 text-muted-foreground">
-              <li>usuario1@copilot.com / 123456</li>
-              <li>usuario2@copilot.com / abcdef</li>
-              <li>scrum@copilot.com / copilot23</li>
-            </ul>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button
-            type="submit"
-            className="w-full"
+      <CardContent className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="email">Correo Electrónico</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="Ingresa tu correo electrónico"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-          >
-            {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
-          </Button>
-        </CardFooter>
-      </form>
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="password">Contraseña</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Ingresa tu contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Link to="/signup" className="text-sm text-muted-foreground">
+          ¿No tienes una cuenta? Regístrate
+        </Link>
+        <Button onClick={handleSubmit} disabled={isLoading}>
+          {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+        </Button>
+      </CardFooter>
     </Card>
   );
-};
+}

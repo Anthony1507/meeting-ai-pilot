@@ -9,7 +9,122 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      meetings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          participants: string[]
+          status: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id: string
+          participants?: string[]
+          status: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          participants?: string[]
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          category: string | null
+          content: string
+          id: string
+          meeting_id: string | null
+          sender: Json | null
+          timestamp: string
+          type: string
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          id: string
+          meeting_id?: string | null
+          sender?: Json | null
+          timestamp?: string
+          type: string
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          id?: string
+          meeting_id?: string | null
+          sender?: Json | null
+          timestamp?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assignee: Json | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          from_message_id: string | null
+          id: string
+          meeting_id: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          assignee?: Json | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          from_message_id?: string | null
+          id: string
+          meeting_id?: string | null
+          status: string
+          title: string
+        }
+        Update: {
+          assignee?: Json | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          from_message_id?: string | null
+          id?: string
+          meeting_id?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_from_message_id_fkey"
+            columns: ["from_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -55,7 +55,7 @@ export const meetingService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
   async getMeeting(id: string) {
@@ -98,10 +98,10 @@ export const meetingService = {
 
     if (error) throw error;
 
-    return data.map(msg => ({
+    return (data || []).map(msg => ({
       ...msg,
       timestamp: new Date(msg.timestamp),
-      sender: msg.sender ? JSON.parse(msg.sender) : undefined,
+      sender: msg.sender ? JSON.parse(msg.sender as string) : undefined,
     }));
   },
 
@@ -140,11 +140,11 @@ export const meetingService = {
 
     if (error) throw error;
 
-    return data.map(task => ({
+    return (data || []).map(task => ({
       ...task,
       createdAt: new Date(task.created_at),
       dueDate: task.due_date ? new Date(task.due_date) : undefined,
-      assignee: task.assignee ? JSON.parse(task.assignee) : undefined,
+      assignee: task.assignee ? JSON.parse(task.assignee as string) : undefined,
     }));
   },
 

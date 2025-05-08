@@ -59,7 +59,7 @@ type MeetingContextType = {
   endMeeting: () => Promise<void>;
 };
 
-// Valores temporales - Serán reemplazados con datos reales de la base de datos
+// Initial values - Will be replaced with real data from the database
 const INITIAL_MESSAGES: Message[] = [];
 const INITIAL_TASKS: Task[] = [];
 
@@ -75,26 +75,31 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeFilter, setActiveFilter] = useState<MessageCategory | undefined>(undefined);
   const { toast } = useToast();
 
-  // Cargar la reunión activa al inicio (si existe)
+  // Load active meeting on initialization (if one exists)
   useEffect(() => {
     const loadActiveMeeting = async () => {
       try {
         setIsLoading(true);
-        // Este sería un endpoint específico que obtendría la reunión activa
-        // Por ahora usamos la primera reunión en progreso
+        // Get all meetings and find one that's in progress
         const meetings = await meetingService.getMeetings();
         const inProgressMeeting = meetings.find(m => m.status === 'in-progress');
         
         if (inProgressMeeting) {
-          setActiveMeeting({
-            ...inProgressMeeting,
+          const meeting: Meeting = {
+            id: inProgressMeeting.id,
+            title: inProgressMeeting.title,
+            description: inProgressMeeting.description,
+            status: inProgressMeeting.status as 'planned' | 'in-progress' | 'completed',
+            participants: inProgressMeeting.participants || [],
             createdAt: new Date(inProgressMeeting.created_at)
-          });
+          };
           
-          // Cargar mensajes y tareas
+          setActiveMeeting(meeting);
+          
+          // Load messages and tasks for this meeting
           await Promise.all([
-            loadMessages(inProgressMeeting.id),
-            loadTasks(inProgressMeeting.id)
+            loadMessages(meeting.id),
+            loadTasks(meeting.id)
           ]);
         }
       } catch (error) {
@@ -144,49 +149,51 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsLoading(true);
       const newMessage = await meetingService.addMessage(activeMeeting.id, message);
       
-      // Convertir el mensaje para nuestro formato interno
-      const formattedMessage: Message = {
-        id: newMessage.id,
-        type: newMessage.type as MessageType,
-        content: newMessage.content,
-        timestamp: new Date(newMessage.timestamp),
-        sender: newMessage.sender ? JSON.parse(newMessage.sender) : undefined,
-        category: newMessage.category as MessageCategory | undefined,
-      };
-      
-      setMessages((prev) => [...prev, formattedMessage]);
-
-      // Si es un mensaje de usuario, analizarlo con IA para detectar tareas, etc.
-      if (message.type === "user") {
-        try {
-          const detectionResult = await aiService.detectTasksAndDefinitions({
-            text: message.content,
-          });
-          
-          // Añadir la respuesta de IA
-          const aiResponse = {
-            type: "ai" as MessageType,
-            content: detectionResult.response,
-            category: detectionResult.category as MessageCategory | undefined,
-          };
-          
-          await addMessage(aiResponse);
-          
-          // Si se detectaron tareas, añadirlas
-          if (detectionResult.tasks && detectionResult.tasks.length > 0) {
-            for (const taskData of detectionResult.tasks) {
-              await addTask({
-                title: taskData.title,
-                description: taskData.description || "",
-                status: "pending",
-                assignee: taskData.assignee,
-                dueDate: taskData.dueDate ? new Date(taskData.dueDate) : undefined,
-                fromMessageId: formattedMessage.id,
-              });
+      if (newMessage) {
+        // Convert the message to our internal format
+        const formattedMessage: Message = {
+          id: newMessage.id,
+          type: newMessage.type as MessageType,
+          content: newMessage.content,
+          timestamp: new Date(newMessage.timestamp),
+          sender: newMessage.sender ? JSON.parse(newMessage.sender as string) : undefined,
+          category: newMessage.category as MessageCategory | undefined,
+        };
+        
+        setMessages((prev) => [...prev, formattedMessage]);
+  
+        // If it's a user message, analyze it with AI to detect tasks, etc.
+        if (message.type === "user") {
+          try {
+            const detectionResult = await aiService.detectTasksAndDefinitions({
+              text: message.content,
+            });
+            
+            // Add the AI response
+            const aiResponse = {
+              type: "ai" as MessageType,
+              content: detectionResult.response,
+              category: detectionResult.category as MessageCategory | undefined,
+            };
+            
+            await addMessage(aiResponse);
+            
+            // If tasks were detected, add them
+            if (detectionResult.tasks && detectionResult.tasks.length > 0) {
+              for (const taskData of detectionResult.tasks) {
+                await addTask({
+                  title: taskData.title,
+                  description: taskData.description || "",
+                  status: "pending",
+                  assignee: taskData.assignee,
+                  dueDate: taskData.dueDate ? new Date(taskData.dueDate) : undefined,
+                  fromMessageId: formattedMessage.id,
+                });
+              }
             }
+          } catch (error) {
+            console.error('Error processing message with AI:', error);
           }
-        } catch (error) {
-          console.error('Error processing message with AI:', error);
         }
       }
     } catch (error) {
@@ -215,24 +222,26 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsLoading(true);
       const newTask = await meetingService.addTask(activeMeeting.id, task);
       
-      // Convertir la tarea a nuestro formato interno
-      const formattedTask: Task = {
-        id: newTask.id,
-        title: newTask.title,
-        description: newTask.description,
-        status: newTask.status as Task["status"],
-        assignee: newTask.assignee ? JSON.parse(newTask.assignee) : undefined,
-        dueDate: newTask.due_date ? new Date(newTask.due_date) : undefined,
-        createdAt: new Date(newTask.created_at),
-        fromMessageId: newTask.from_message_id,
-      };
-      
-      setTasks((prev) => [...prev, formattedTask]);
-      
-      toast({
-        title: "Tarea creada",
-        description: `"${task.title}" ha sido añadida a la lista.`,
-      });
+      if (newTask) {
+        // Convert the task to our internal format
+        const formattedTask: Task = {
+          id: newTask.id,
+          title: newTask.title,
+          description: newTask.description,
+          status: newTask.status as Task["status"],
+          assignee: newTask.assignee ? JSON.parse(newTask.assignee as string) : undefined,
+          dueDate: newTask.due_date ? new Date(newTask.due_date) : undefined,
+          createdAt: new Date(newTask.created_at),
+          fromMessageId: newTask.from_message_id,
+        };
+        
+        setTasks((prev) => [...prev, formattedTask]);
+        
+        toast({
+          title: "Tarea creada",
+          description: `"${task.title}" ha sido añadida a la lista.`,
+        });
+      }
     } catch (error) {
       console.error('Error adding task:', error);
       toast({
@@ -284,25 +293,33 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({
         participants,
       });
       
-      // Actualizar estado de la reunión a 'in-progress'
-      const updatedMeeting = await meetingService.updateMeeting({
-        id: newMeeting.id,
-        status: 'in-progress',
-      });
-      
-      setActiveMeeting({
-        ...updatedMeeting,
-        createdAt: new Date(updatedMeeting.created_at),
-      });
-      
-      // Limpiar mensajes y tareas anteriores
-      setMessages([]);
-      setTasks([]);
-      
-      toast({
-        title: "Reunión iniciada",
-        description: `"${title}" ha iniciado correctamente.`,
-      });
+      if (newMeeting) {
+        // Update meeting status to 'in-progress'
+        const updatedMeeting = await meetingService.updateMeeting({
+          id: newMeeting.id,
+          status: 'in-progress',
+        });
+        
+        if (updatedMeeting) {
+          setActiveMeeting({
+            id: updatedMeeting.id,
+            title: updatedMeeting.title,
+            description: updatedMeeting.description,
+            status: updatedMeeting.status as 'planned' | 'in-progress' | 'completed',
+            participants: updatedMeeting.participants || [],
+            createdAt: new Date(updatedMeeting.created_at),
+          });
+          
+          // Clear previous messages and tasks
+          setMessages([]);
+          setTasks([]);
+          
+          toast({
+            title: "Reunión iniciada",
+            description: `"${title}" ha iniciado correctamente.`,
+          });
+        }
+      }
     } catch (error) {
       console.error('Error starting meeting:', error);
       toast({
