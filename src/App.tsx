@@ -14,6 +14,7 @@ import SummaryPage from "./pages/SummaryPage";
 import LogPage from "./pages/LogPage";
 import TasksPage from "./pages/TasksPage";
 import SearchPage from "./pages/SearchPage";
+import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
 import { MainLayout } from "./components/MainLayout";
 import { useAuth } from "./contexts/AuthContext";
@@ -45,6 +46,7 @@ const AppRoutes = () => {
         <Route path="log" element={<LogPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="search" element={<SearchPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

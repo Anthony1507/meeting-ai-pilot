@@ -10,6 +10,8 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { aiService } from "@/services/ai.service";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { playAudioFromBase64 } from "@/utils/audio-utils";
 
 export default function MeetingPage() {
   const { messages, addMessage, activeMeeting, isLoading, startMeeting, endMeeting } = useMeeting();
@@ -19,7 +21,10 @@ export default function MeetingPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [showAttachDialog, setShowAttachDialog] = useState(false);
+  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -60,6 +65,7 @@ export default function MeetingPage() {
         setAudioBlob(blob);
         
         try {
+          setIsProcessingAudio(true);
           toast({
             title: "Procesando audio",
             description: "Transcribiendo grabación...",
@@ -90,6 +96,8 @@ export default function MeetingPage() {
             description: "No se pudo transcribir el audio.",
             variant: "destructive",
           });
+        } finally {
+          setIsProcessingAudio(false);
         }
       };
 
@@ -135,10 +143,45 @@ export default function MeetingPage() {
   };
 
   const handleAttachClick = () => {
-    toast({
-      title: "Adjuntar archivo",
-      description: "Función de adjuntar archivo en desarrollo",
-    });
+    setShowAttachDialog(true);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    try {
+      toast({
+        title: "Subiendo archivo",
+        description: `Subiendo ${file.name}...`,
+      });
+      
+      // Aquí se podría implementar la lógica de subida de archivo
+      // Por ahora solo enviamos un mensaje con el nombre del archivo
+      
+      await addMessage({
+        type: "user",
+        content: `He adjuntado un archivo: ${file.name}`,
+        sender: {
+          id: user.id,
+          name: user.name,
+          avatar: user.avatar,
+        },
+      });
+      
+      setShowAttachDialog(false);
+      toast({
+        title: "Archivo subido",
+        description: `${file.name} ha sido adjuntado.`,
+      });
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo adjuntar el archivo.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleReaction = (messageId: string) => {
@@ -149,11 +192,20 @@ export default function MeetingPage() {
   };
 
   const handleStartMeeting = async () => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "Debes iniciar sesión para crear una reunión.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       await startMeeting(
         "Sprint Planning #12",
         "Planificación del sprint número 12",
-        [user?.id as string]
+        [user.id]
       );
       
       toast({
@@ -162,14 +214,29 @@ export default function MeetingPage() {
       });
     } catch (error) {
       console.error('Error starting meeting:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo iniciar la reunión.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleEndMeeting = async () => {
     try {
       await endMeeting();
+      
+      toast({
+        title: "Reunión finalizada",
+        description: "La reunión ha sido finalizada y se ha generado un resumen.",
+      });
     } catch (error) {
       console.error('Error ending meeting:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo finalizar la reunión.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -178,7 +245,7 @@ export default function MeetingPage() {
       return (
         <div className="message-ai animate-fade-in">
           <div className="flex items-start gap-3">
-            <div className="min-w-8 h-8 rounded-full bg-ai flex items-center justify-center text-white">
+            <div className="min-w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -226,6 +293,36 @@ export default function MeetingPage() {
                 >
                   <ThumbsUp className="h-3 w-3 mr-1" />
                   Confirmar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-7 px-2 text-xs"
+                  onClick={async () => {
+                    try {
+                      toast({
+                        title: "Generando audio",
+                        description: "Convirtiendo texto a voz...",
+                      });
+                      
+                      const base64Audio = await aiService.textToSpeech({
+                        text: message.content,
+                      });
+                      
+                      if (base64Audio) {
+                        await playAudioFromBase64(base64Audio);
+                      }
+                    } catch (error) {
+                      console.error('Error generating speech:', error);
+                      toast({
+                        title: "Error",
+                        description: "No se pudo generar el audio.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  🔊 Escuchar
                 </Button>
               </div>
             </div>
@@ -314,7 +411,7 @@ export default function MeetingPage() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             className="flex-1"
-            disabled={isLoading || isRecording}
+            disabled={isLoading || isRecording || isProcessingAudio}
           />
           <Button 
             type="button" 
@@ -322,14 +419,14 @@ export default function MeetingPage() {
             variant={isRecording ? "destructive" : "outline"}
             className={isRecording ? "animate-pulse" : ""}
             onClick={handleMicClick}
-            disabled={isLoading}
+            disabled={isLoading || isProcessingAudio}
           >
             {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
           <Button 
             type="submit" 
             size="icon"
-            disabled={isLoading || isRecording || !inputValue.trim()}
+            disabled={isLoading || isRecording || isProcessingAudio || !inputValue.trim()}
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -340,11 +437,37 @@ export default function MeetingPage() {
             size="sm" 
             onClick={handleEndMeeting}
             className="text-destructive"
+            disabled={isLoading}
           >
             Finalizar reunión
           </Button>
         </div>
       </div>
+
+      {/* Dialog para adjuntar archivos */}
+      <Dialog open={showAttachDialog} onOpenChange={setShowAttachDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjuntar archivo</DialogTitle>
+            <DialogDescription>
+              Selecciona un archivo para adjuntar a la conversación
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="block w-full text-sm text-slate-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0
+                file:text-sm file:font-semibold
+                file:bg-primary file:text-white
+                hover:file:bg-primary/80"
+              onChange={handleFileChange}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

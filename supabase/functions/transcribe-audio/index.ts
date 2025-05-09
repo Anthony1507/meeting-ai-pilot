@@ -4,30 +4,24 @@
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
-import { OpenAI } from 'https://esm.sh/openai@4.33.0';
 
-// Configuración de Supabase y OpenAI
+// Configuración de Supabase
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') || '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 );
 
-// IMPORTANTE: Aquí es donde debes configurar tu API key de OpenAI
-// No coloques la clave directamente aquí, usa las variables de entorno de Supabase
-const openai = new OpenAI({
-  apiKey: Deno.env.get('OPENAI_API_KEY')
-});
+// Headers CORS
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
   // CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-      }
-    });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -36,11 +30,15 @@ serve(async (req) => {
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     const { filePath } = await req.json();
+
+    if (!filePath) {
+      throw new Error('No se proporcionó una ruta de archivo');
+    }
 
     // Obtener el archivo del Storage de Supabase
     const { data: fileData, error: fileError } = await supabaseClient
@@ -52,30 +50,31 @@ serve(async (req) => {
       throw new Error(`Error obteniendo archivo: ${fileError.message}`);
     }
 
-    // Convertir el archivo a una forma que OpenAI pueda procesar
-    const audioBlob = new Blob([fileData], { type: 'audio/webm' });
+    // Utilizar la API de Gemini para transcripción de audio
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
-    formData.append('model', 'whisper-1');
-    formData.append('language', 'es');
+    formData.append('file', new Blob([fileData], { type: 'audio/webm' }), 'audio.webm');
 
-    // Llamar directamente a la API de transcripción de OpenAI
-    const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
+    // Usamos Gemini API para transcribir
+    const { data, error } = await supabaseClient.functions.invoke('generate-with-gemini', {
+      body: { 
+        prompt: `
+          Transcribe el siguiente audio. Responde solo con la transcripción, sin añadir ningún texto adicional.
+          [AUDIO]
+        `,
+        audio: fileData // Enviamos el audio como blob
       },
-      body: formData
     });
 
-    const transcriptionData = await transcriptionResponse.json();
+    if (error) {
+      throw new Error(`Error de transcripción: ${error.message}`);
+    }
 
     return new Response(JSON.stringify({ 
-      transcription: transcriptionData.text 
+      transcription: data?.text || "No se pudo transcribir el audio" 
     }), {
       headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        ...corsHeaders, 
+        'Content-Type': 'application/json'
       }
     });
   } catch (error) {
@@ -83,8 +82,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        ...corsHeaders, 
+        'Content-Type': 'application/json'
       }
     });
   }

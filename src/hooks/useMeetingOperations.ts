@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import { meetingService } from "@/services/meeting.service";
 import { aiService } from "@/services/ai.service";
-import { Message, Task, MessageCategory } from "@/types/meeting.types";
+import { Message, Task, MessageCategory, Meeting } from "@/types/meeting.types";
 import { useToast } from "@/hooks/use-toast";
 
 interface MeetingOperationsProps {
-  activeMeeting: any;
-  setActiveMeeting: (meeting: any) => void;
+  activeMeeting: Meeting | null;
+  setActiveMeeting: (meeting: Meeting | null) => void;
   messages: Message[];
   setMessages: (messages: Message[]) => void;
   tasks: Task[];
@@ -56,7 +56,7 @@ export function useMeetingOperations({
           category: newMessage.category as MessageCategory | undefined,
         };
         
-        setMessages((prev) => [...prev, formattedMessage]);
+        setMessages((prev: Message[]) => [...prev, formattedMessage]);
   
         // If it's a user message, analyze it with AI to detect tasks, etc.
         if (message.type === "user") {
@@ -131,7 +131,7 @@ export function useMeetingOperations({
           fromMessageId: newTask.from_message_id,
         };
         
-        setTasks((prev) => [...prev, formattedTask]);
+        setTasks((prev: Task[]) => [...prev, formattedTask]);
         
         toast({
           title: "Tarea creada",
@@ -155,7 +155,7 @@ export function useMeetingOperations({
       setIsLoading(true);
       await meetingService.updateTaskStatus(taskId, status);
       
-      setTasks((prev) =>
+      setTasks((prev: Task[]) =>
         prev.map((task) =>
           task.id === taskId ? { ...task, status } : task
         )

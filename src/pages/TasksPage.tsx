@@ -9,11 +9,13 @@ import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2, Clock, AlertCircle, XCircle, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { CreateTaskDialog } from "@/components/CreateTaskDialog";
 
 export default function TasksPage() {
-  const { tasks, updateTaskStatus } = useMeeting();
+  const { tasks, addTask, updateTaskStatus } = useMeeting();
   const { toast } = useToast();
   const [view, setView] = useState<"cards" | "list">("cards");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const pendingTasks = tasks.filter((task) => task.status === "pending");
   const inProgressTasks = tasks.filter((task) => task.status === "in-progress");
@@ -35,10 +37,35 @@ export default function TasksPage() {
   };
 
   const handleAddTask = () => {
-    toast({
-      title: "Crear tarea",
-      description: "Funcionalidad en desarrollo",
-    });
+    setIsDialogOpen(true);
+  };
+
+  const handleCreateTask = async (task: {
+    title: string;
+    description: string;
+    dueDate?: Date;
+  }) => {
+    try {
+      await addTask({
+        title: task.title,
+        description: task.description,
+        status: "pending",
+        dueDate: task.dueDate,
+      });
+      
+      toast({
+        title: "Tarea creada",
+        description: `"${task.title}" ha sido añadida a la lista.`,
+      });
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la tarea.",
+        variant: "destructive",
+      });
+      throw error; // Re-throw for the component to handle
+    }
   };
 
   const TaskCard = ({ task }: { task: Task }) => {
@@ -128,10 +155,6 @@ export default function TasksPage() {
           </Badge>
         );
       case "in-progress":
-        <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-          <Clock className="h-3 w-3 mr-1" />
-          En progreso
-        </Badge>;
         return (
           <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
             <Clock className="h-3 w-3 mr-1" />
@@ -198,34 +221,60 @@ export default function TasksPage() {
         
         <TabsContent value="all" className="space-y-4">
           <div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : ""}>
-            {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
+            {tasks.length > 0 ? (
+              tasks.map((task) => <TaskCard key={task.id} task={task} />)
+            ) : (
+              <div className="text-center p-8 bg-muted/50 rounded-lg">
+                <XCircle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                <h3 className="text-lg font-medium">No hay tareas</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  No hay tareas creadas aún. Puedes crear una nueva tarea o hablar en una reunión para que se detecten automáticamente.
+                </p>
+                <Button onClick={handleAddTask}>
+                  <Plus className="mr-1 h-4 w-4" /> Nueva tarea
+                </Button>
+              </div>
+            )}
           </div>
         </TabsContent>
         
         <TabsContent value="pending" className="space-y-4">
           <div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : ""}>
-            {pendingTasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
+            {pendingTasks.length > 0 ? (
+              pendingTasks.map((task) => <TaskCard key={task.id} task={task} />)
+            ) : (
+              <div className="text-center p-8 bg-muted/50 rounded-lg">
+                <XCircle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                <h3 className="text-lg font-medium">No hay tareas pendientes</h3>
+                <p className="text-sm text-muted-foreground">
+                  No hay tareas pendientes en este momento
+                </p>
+              </div>
+            )}
           </div>
         </TabsContent>
         
         <TabsContent value="in-progress" className="space-y-4">
           <div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : ""}>
-            {inProgressTasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
+            {inProgressTasks.length > 0 ? (
+              inProgressTasks.map((task) => <TaskCard key={task.id} task={task} />)
+            ) : (
+              <div className="text-center p-8 bg-muted/50 rounded-lg">
+                <XCircle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                <h3 className="text-lg font-medium">No hay tareas en progreso</h3>
+                <p className="text-sm text-muted-foreground">
+                  No hay tareas en progreso en este momento
+                </p>
+              </div>
+            )}
           </div>
         </TabsContent>
         
         <TabsContent value="completed" className="space-y-4">
           <div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : ""}>
-            {completedTasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
-            {completedTasks.length === 0 && (
+            {completedTasks.length > 0 ? (
+              completedTasks.map((task) => <TaskCard key={task.id} task={task} />)
+            ) : (
               <div className="text-center p-8 bg-muted/50 rounded-lg">
                 <XCircle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
                 <h3 className="text-lg font-medium">No hay tareas completadas</h3>
@@ -237,6 +286,12 @@ export default function TasksPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <CreateTaskDialog 
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onCreateTask={handleCreateTask}
+      />
     </div>
   );
 }

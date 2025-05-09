@@ -1,134 +1,195 @@
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { authService, SignInCredentials, SignUpCredentials } from "@/services/auth.service";
-import { useToast } from "@/hooks/use-toast";
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
-type User = {
+interface User {
   id: string;
-  email: string;
   name: string;
+  email: string;
   avatar: string;
-  role: string;
-};
+}
 
-type AuthContextType = {
+interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
-  login: (credentials: SignInCredentials) => Promise<boolean>;
-  register: (credentials: SignUpCredentials) => Promise<boolean>;
-  logout: () => Promise<void>;
   isAuthenticated: boolean;
-};
+  isLoading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  updateUserProfile: ({ name }: { name: string }) => Promise<void>;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Función auxiliar para obtener avatar por defecto
-const getDefaultAvatar = (name: string) => {
-  // Genera un avatar basado en las iniciales o usa un servicio como ui-avatars
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&size=200`;
-};
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
-  children 
-}) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  // Verificar usuario al inicio
   useEffect(() => {
-    const checkUser = async () => {
+    const fetchUser = async () => {
       try {
-        const currentUser = await authService.getCurrentUser();
-        if (currentUser) {
-          // Transformamos los datos del usuario a nuestro formato
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+
+        if (authUser) {
+          // Convertir el usuario de Supabase en nuestro formato
           setUser({
-            id: currentUser.id,
-            email: currentUser.email || '',
-            name: currentUser.user_metadata?.name || 'Usuario',
-            avatar: currentUser.user_metadata?.avatar_url || getDefaultAvatar(currentUser.user_metadata?.name || 'Usuario'),
-            role: currentUser.user_metadata?.role || 'Usuario',
+            id: authUser.id,
+            name: authUser.user_metadata.name || 'Usuario',
+            email: authUser.email || '',
+            avatar: authUser.user_metadata.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(authUser.user_metadata.name || 'Usuario')}`,
           });
         }
       } catch (error) {
-        console.error('Error checking authentication:', error);
+        console.error('Error obteniendo usuario:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    checkUser();
+    fetchUser();
+
+    // Suscribirse a cambios en la sesión
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata.name || 'Usuario',
+          email: session.user.email || '',
+          avatar: session.user.user_metadata.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.user.user_metadata.name || 'Usuario')}`,
+        });
+      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = async ({ email, password }: SignInCredentials) => {
+  const signIn = async (email: string, password: string) => {
     try {
-      setIsLoading(true);
-      const { user: authUser } = await authService.signIn({ email, password });
-      
-      if (authUser) {
-        setUser({
-          id: authUser.id,
-          email: authUser.email || '',
-          name: authUser.user_metadata?.name || 'Usuario',
-          avatar: authUser.user_metadata?.avatar_url || getDefaultAvatar(authUser.user_metadata?.name || 'Usuario'),
-          role: authUser.user_metadata?.role || 'Usuario',
-        });
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        title: "Error de autenticación",
-        description: "Credenciales incorrectas o problemas en el servidor.",
-        variant: "destructive",
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const register = async ({ email, password, name }: SignUpCredentials) => {
-    try {
-      setIsLoading(true);
-      const { user: authUser } = await authService.signUp({ email, password, name });
-      
-      if (authUser) {
+      if (error) {
         toast({
-          title: "Registro exitoso",
-          description: "Tu cuenta ha sido creada. Por favor, verifica tu email.",
+          title: "Error al iniciar sesión",
+          description: error.message,
+          variant: "destructive",
         });
-        return true;
+        throw error;
       }
-      return false;
+
+      // Actualizar el usuario en el estado
+      if (data.user) {
+        setUser({
+          id: data.user.id,
+          name: data.user.user_metadata.name || 'Usuario',
+          email: data.user.email || '',
+          avatar: data.user.user_metadata.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data.user.user_metadata.name || 'Usuario')}`,
+        });
+
+        toast({
+          title: "Inicio de sesión exitoso",
+          description: "Has iniciado sesión correctamente",
+        });
+
+        navigate('/meeting');
+      }
     } catch (error) {
-      console.error('Registration error:', error);
-      toast({
-        title: "Error de registro",
-        description: "No se pudo crear la cuenta. Intenta nuevamente.",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsLoading(false);
+      console.error('Error en inicio de sesión:', error);
+      throw error;
     }
   };
 
-  const logout = async () => {
+  const signUp = async (email: string, password: string, name: string) => {
     try {
-      setIsLoading(true);
-      await authService.signOut();
-      setUser(null);
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast({
-        title: "Error al cerrar sesión",
-        description: "Hubo un problema al cerrar sesión.",
-        variant: "destructive",
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+          },
+        },
       });
-    } finally {
-      setIsLoading(false);
+
+      if (error) {
+        toast({
+          title: "Error al registrarse",
+          description: error.message,
+          variant: "destructive",
+        });
+        throw error;
+      }
+
+      toast({
+        title: "Registro exitoso",
+        description: "Te has registrado correctamente. Ahora puedes iniciar sesión.",
+      });
+
+      navigate('/');
+    } catch (error) {
+      console.error('Error en registro:', error);
+      throw error;
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión correctamente.",
+      });
+      navigate('/');
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+  };
+
+  const updateUserProfile = async ({ name }: { name: string }) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          name,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+        },
+      });
+
+      if (error) {
+        toast({
+          title: "Error al actualizar perfil",
+          description: error.message,
+          variant: "destructive",
+        });
+        throw error;
+      }
+
+      // Actualizar el estado del usuario
+      if (user) {
+        setUser({
+          ...user,
+          name,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+        });
+      }
+
+      toast({
+        title: "Perfil actualizado",
+        description: "Tu perfil ha sido actualizado correctamente.",
+      });
+    } catch (error) {
+      console.error('Error al actualizar perfil:', error);
+      throw error;
     }
   };
 
@@ -136,11 +197,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     <AuthContext.Provider
       value={{
         user,
-        isLoading,
-        login,
-        register,
-        logout,
         isAuthenticated: !!user,
+        isLoading,
+        signIn,
+        signUp,
+        signOut,
+        updateUserProfile,
       }}
     >
       {children}
@@ -151,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth debe utilizarse dentro de un AuthProvider');
   }
   return context;
 };
