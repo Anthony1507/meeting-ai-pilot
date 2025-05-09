@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
@@ -17,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { LogOut, ChevronDown, Menu } from "lucide-react";
+import { LogOut, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +30,7 @@ import {
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const MainLayout: React.FC = () => {
-  const { user, logout } = useAuth(); // Using logout which is now properly defined
+  const { user, logout } = useAuth(); 
   const { toast } = useToast();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
@@ -58,7 +59,7 @@ export const MainLayout: React.FC = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen">
+      <div className="flex h-screen w-full">
         <Sidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="h-16 border-b flex items-center justify-between px-4 bg-background">
@@ -82,9 +83,11 @@ export const MainLayout: React.FC = () => {
                       <AvatarImage src={user?.avatar} alt={user?.name} />
                       <AvatarFallback>
                         {user?.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
+                          ? user.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                          : "U"}
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-sm hidden md:block">{user?.name}</span>

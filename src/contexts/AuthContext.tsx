@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -16,10 +15,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  login: (credentials: { email: string; password: string }) => Promise<void>; // Alias for LoginForm.tsx
+  login: (credentials: { email: string; password: string }) => Promise<void>; 
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
-  logout: () => Promise<void>; // Alias for MainLayout.tsx
+  logout: () => Promise<void>; 
   updateUserProfile: ({ name }: { name: string }) => Promise<void>;
 }
 
@@ -37,7 +36,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
         if (authUser) {
-          // Convertir el usuario de Supabase en nuestro formato
           setUser({
             id: authUser.id,
             name: authUser.user_metadata.name || 'Usuario',
@@ -54,7 +52,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     fetchUser();
 
-    // Suscribirse a cambios en la sesión
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         setUser({
@@ -89,7 +86,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
 
-      // Actualizar el usuario en el estado
       if (data.user) {
         setUser({
           id: data.user.id,
@@ -111,7 +107,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Alias method for LoginForm.tsx
   const login = async ({ email, password }: { email: string; password: string }) => {
     return signIn(email, password);
   };
@@ -163,7 +158,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Alias method for MainLayout.tsx
   const logout = async () => {
     return signOut();
   };
@@ -186,7 +180,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
 
-      // Actualizar el estado del usuario
       if (user) {
         setUser({
           ...user,
