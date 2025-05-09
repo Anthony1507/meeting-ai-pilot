@@ -12,7 +12,7 @@ import { Link } from "react-router-dom";
 const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login } = useAuth(); // Changed from signIn to login to match AuthContext
+  const { login } = useAuth(); // Using login which is now properly defined
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +21,6 @@ const LoginForm = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // @ts-ignore - we'll fix the type definition later
       await login({ email, password });
       navigate("/meeting");
     } catch (error: any) {

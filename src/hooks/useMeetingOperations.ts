@@ -9,9 +9,9 @@ interface MeetingOperationsProps {
   activeMeeting: Meeting | null;
   setActiveMeeting: (meeting: Meeting | null) => void;
   messages: Message[];
-  setMessages: (messages: Message[]) => void;
+  setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
   tasks: Task[];
-  setTasks: (tasks: Task[]) => void;
+  setTasks: (tasks: Task[] | ((prev: Task[]) => Task[])) => void;
   setIsLoading: (isLoading: boolean) => void;
   loadMessages: (meetingId: string) => Promise<void>;
   loadTasks: (meetingId: string) => Promise<void>;

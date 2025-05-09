@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
@@ -30,7 +29,7 @@ import {
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const MainLayout: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth(); // Using logout which is now properly defined
   const { toast } = useToast();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 

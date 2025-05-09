@@ -16,8 +16,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  login: (credentials: { email: string; password: string }) => Promise<void>; // Alias for LoginForm.tsx
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
+  logout: () => Promise<void>; // Alias for MainLayout.tsx
   updateUserProfile: ({ name }: { name: string }) => Promise<void>;
 }
 
@@ -109,6 +111,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Alias method for LoginForm.tsx
+  const login = async ({ email, password }: { email: string; password: string }) => {
+    return signIn(email, password);
+  };
+
   const signUp = async (email: string, password: string, name: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -156,6 +163,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Alias method for MainLayout.tsx
+  const logout = async () => {
+    return signOut();
+  };
+
   const updateUserProfile = async ({ name }: { name: string }) => {
     try {
       const { error } = await supabase.auth.updateUser({
@@ -200,8 +212,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         isAuthenticated: !!user,
         isLoading,
         signIn,
+        login,
         signUp,
         signOut,
+        logout,
         updateUserProfile,
       }}
     >
